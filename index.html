@@ -281,25 +281,39 @@
 
     // Draw outer (sensing) frame as a large square with thick border
     ctx.strokeStyle = '#333';
-    ctx.lineWidth = 20;
+    ctx.lineWidth = 40;
     ctx.strokeRect(-outerFrameSize/2, -outerFrameSize/2, outerFrameSize, outerFrameSize);
-    
     ctx.fillRect(-outerFrameSize/2, -fingerWidth/2, fingerLen, fingerWidth);
     ctx.fillRect(outerFrameSize/2, -fingerWidth/2, -fingerLen, fingerWidth);
     ctx.fillRect(supportOffset + supportWidth, outerFrameSize/2, supportWidth, -supportLen);
     ctx.fillRect(-supportOffset- supportWidth, outerFrameSize/2, supportWidth, -supportLen);
     ctx.fillRect(supportOffset + supportWidth, -outerFrameSize/2, supportWidth, supportLen);
     ctx.fillRect(-supportOffset- supportWidth, -outerFrameSize/2, supportWidth, supportLen);
+    ctx.fillStyle = '#aaa';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Click and Drag Here', 0, -outerFrameSize/2+10);
+    ctx.rotate(-180 * Math.PI/180);
+    ctx.fillText('Click and Drag Here', 0, -outerFrameSize/2+10);
+    ctx.rotate(90 * Math.PI/180);
+    ctx.fillText('Click and Drag Here', 0, -outerFrameSize/2+10);
+    ctx.rotate(180 * Math.PI/180);
+    ctx.fillText('Click and Drag Here', 0, -outerFrameSize/2+10);
+
+    ctx.rotate(-90 * Math.PI/180);
+    
+    ctx.fillStyle = '#333';
+
     
     // Draw the inner (drive) frame inside the outer frame:
     // It vibrates horizontally relative to the outer frame's center.
     ctx.translate(0, innerFrameY);
     ctx.lineWidth = 3;
     let coils = 8;
-    drawSpring(innerFrameWidth/2, innerFrameHeight/2, innerFrameWidth/2, outerFrameSize/2 - innerFrameY, coils );
-    drawSpring(-innerFrameWidth/2, innerFrameHeight/2, -innerFrameWidth/2, outerFrameSize/2 - innerFrameY , coils);
-    drawSpring(innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth/2, -outerFrameSize/2 - innerFrameY, coils );
-    drawSpring(-innerFrameWidth/2, -innerFrameHeight/2, -innerFrameWidth/2, -outerFrameSize/2 - innerFrameY, coils );
+    drawSpring(innerFrameWidth/2, innerFrameHeight/2, innerFrameWidth/2, outerFrameSize/2 - innerFrameY+10, coils );
+    drawSpring(-innerFrameWidth/2, innerFrameHeight/2, -innerFrameWidth/2, outerFrameSize/2 - innerFrameY+10 , coils);
+    drawSpring(innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth/2, -outerFrameSize/2 - innerFrameY+10, coils );
+    drawSpring(-innerFrameWidth/2, -innerFrameHeight/2, -innerFrameWidth/2, -outerFrameSize/2 - innerFrameY+10, coils );
     ctx.fillStyle = '#aaa';
     ctx.fillRect(-innerFrameWidth/2, -innerFrameHeight/2, -fingerLen, fingerWidth);
     ctx.fillRect(-innerFrameWidth/2, innerFrameHeight/2 - fingerWidth,-fingerLen, fingerWidth);
@@ -327,8 +341,8 @@
     // Draw the resonating mass inside the inner frame
     ctx.fillStyle = '#aaa';
     ctx.fillRect(-massWidth/2, -massHeight/2, massWidth, massHeight);
+    // There are two context items on the stack, so we need to restore twice
     ctx.restore();
-    
     ctx.restore();
     
     // Draw a center marker for the outer frame in world coordinates
