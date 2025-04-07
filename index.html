@@ -310,8 +310,8 @@
     ctx.translate(0, innerFrameY);
     ctx.lineWidth = 3;
     let coils = 8;
-    drawSpring(innerFrameWidth/2, innerFrameHeight/2, innerFrameWidth/2, outerFrameSize/2 - innerFrameY+10, coils );
-    drawSpring(-innerFrameWidth/2, innerFrameHeight/2, -innerFrameWidth/2, outerFrameSize/2 - innerFrameY+10 , coils);
+    drawSpring(innerFrameWidth/2, innerFrameHeight/2, innerFrameWidth/2, outerFrameSize/2 - innerFrameY-10, coils );
+    drawSpring(-innerFrameWidth/2, innerFrameHeight/2, -innerFrameWidth/2, outerFrameSize/2 - innerFrameY-10 , coils);
     drawSpring(innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth/2, -outerFrameSize/2 - innerFrameY+10, coils );
     drawSpring(-innerFrameWidth/2, -innerFrameHeight/2, -innerFrameWidth/2, -outerFrameSize/2 - innerFrameY+10, coils );
     ctx.fillStyle = '#aaa';
