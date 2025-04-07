@@ -91,8 +91,14 @@
   let lastFrameAngle = frameAngle;
   let lastFrameAngleTime = Date.now();
 
+  // Finger length and width
   const fingerWidth = 10;
-  const fingerLenMargin = 30;
+  const fingerLen = 52;
+
+  // Support vars
+  const supportWidth = 10;
+  const supportLen = 80;
+  const supportOffset = 20;
 
   // Helper function to compute the smallest angle difference accounting for wrap-around
   function angleDifference(newAngle, oldAngle) {
@@ -118,10 +124,10 @@
   };
   Plotly.newPlot('gyroPlot', gyroData, gyroLayout);
 
-  function drawSpring(x1, y1, x2, y2) {
-    const segments = 20;
+  function drawSpring(x1, y1, x2, y2, coils) {
+    const segments = 40;
     const amplitude = 10;
-    const oscillations = 4; // Number of full sine cycles along the spring
+    const oscillations = coils; // Number of full sine cycles along the spring
     let dx = x2 - x1;
     let dy = y2 - y1;
     let angle = Math.atan2(dy, dx);
@@ -278,23 +284,43 @@
     ctx.lineWidth = 20;
     ctx.strokeRect(-outerFrameSize/2, -outerFrameSize/2, outerFrameSize, outerFrameSize);
     
-    ctx.fillRect(-outerFrameSize/2, -fingerWidth/2, innerFrameWidth/2 - fingerLenMargin, fingerWidth);
-    ctx.fillRect(outerFrameSize/2, -fingerWidth/2, -innerFrameWidth/2 + fingerLenMargin, fingerWidth);
+    ctx.fillRect(-outerFrameSize/2, -fingerWidth/2, fingerLen, fingerWidth);
+    ctx.fillRect(outerFrameSize/2, -fingerWidth/2, -fingerLen, fingerWidth);
+    ctx.fillRect(supportOffset + supportWidth, outerFrameSize/2, supportWidth, -supportLen);
+    ctx.fillRect(-supportOffset- supportWidth, outerFrameSize/2, supportWidth, -supportLen);
+    ctx.fillRect(supportOffset + supportWidth, -outerFrameSize/2, supportWidth, supportLen);
+    ctx.fillRect(-supportOffset- supportWidth, -outerFrameSize/2, supportWidth, supportLen);
     
     // Draw the inner (drive) frame inside the outer frame:
     // It vibrates horizontally relative to the outer frame's center.
     ctx.translate(0, innerFrameY);
     ctx.lineWidth = 3;
-    drawSpring(innerFrameWidth/2, innerFrameHeight/2, innerFrameWidth/2, outerFrameSize/2 - innerFrameY );
-    drawSpring(-innerFrameWidth/2, innerFrameHeight/2, -innerFrameWidth/2, outerFrameSize/2 - innerFrameY );
-    drawSpring(innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth/2, -outerFrameSize/2 - innerFrameY );
-    drawSpring(-innerFrameWidth/2, -innerFrameHeight/2, -innerFrameWidth/2, -outerFrameSize/2 - innerFrameY );
-    ctx.fillRect(-innerFrameWidth/2, -innerFrameHeight/2, -innerFrameWidth/2 + fingerLenMargin, fingerWidth);
-    ctx.fillRect(-innerFrameWidth/2, innerFrameHeight/2 - fingerWidth, -innerFrameWidth/2 + fingerLenMargin, fingerWidth);
-    ctx.fillRect(innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth/2 - fingerLenMargin, fingerWidth);
-    ctx.fillRect(innerFrameWidth/2, innerFrameHeight/2 - fingerWidth, innerFrameWidth/2 - fingerLenMargin, fingerWidth);
+    let coils = 8;
+    drawSpring(innerFrameWidth/2, innerFrameHeight/2, innerFrameWidth/2, outerFrameSize/2 - innerFrameY, coils );
+    drawSpring(-innerFrameWidth/2, innerFrameHeight/2, -innerFrameWidth/2, outerFrameSize/2 - innerFrameY , coils);
+    drawSpring(innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth/2, -outerFrameSize/2 - innerFrameY, coils );
+    drawSpring(-innerFrameWidth/2, -innerFrameHeight/2, -innerFrameWidth/2, -outerFrameSize/2 - innerFrameY, coils );
+    ctx.fillStyle = '#aaa';
+    ctx.fillRect(-innerFrameWidth/2, -innerFrameHeight/2, -fingerLen, fingerWidth);
+    ctx.fillRect(-innerFrameWidth/2, innerFrameHeight/2 - fingerWidth,-fingerLen, fingerWidth);
+    ctx.fillRect(innerFrameWidth/2, -innerFrameHeight/2, fingerLen, fingerWidth);
+    ctx.fillRect(innerFrameWidth/2, innerFrameHeight/2 - fingerWidth, fingerLen, fingerWidth);
+
+    // Draw the support
+    ctx.fillStyle = '#aaa';
+    ctx.fillRect(supportOffset, innerFrameHeight/2, supportWidth, supportLen);
+    ctx.fillRect(-supportOffset, innerFrameHeight/2, supportWidth, supportLen);
+    ctx.fillRect(supportOffset, -innerFrameHeight/2, supportWidth, -supportLen);
+    ctx.fillRect(-supportOffset, -innerFrameHeight/2, supportWidth, -supportLen);
+
+    // draw drive springs
+    coils = 4;
+    ctx.strokeStyle = '#aaa';
+    drawSpring(innerFrameWidth/2, 0 , drive, 0, coils );
+    drawSpring(-innerFrameWidth/2, 0 , drive, 0, coils );
+
     ctx.save();
-    ctx.strokeStyle = '#333';
+    ctx.strokeStyle = '#aaa';
     ctx.lineWidth = 5;
     ctx.strokeRect(-innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth, innerFrameHeight);
     ctx.translate(drive, 0);
@@ -308,7 +334,7 @@
     // Draw a center marker for the outer frame in world coordinates
     ctx.fillStyle = '#333';
     ctx.beginPath();
-    ctx.arc(centerX, centerY, 5, 0, 2 * Math.PI);
+    ctx.arc(centerX, centerY, 3, 0, 2 * Math.PI);
     ctx.fill();
   }
 
