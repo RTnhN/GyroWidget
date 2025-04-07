@@ -64,11 +64,11 @@
   // Outer (sensing) frame parameters
   const outerFrameSize = 300;      // size of outer frame in pixels
   const springK_inner = 30;        // spring constant for vertical restoring force
-  const -dampingInner = 4;          // damping for outer frame vertical motion
+  const dampingInner = 4;          // damping for outer frame vertical motion
   const m_inner = 1.0;             // effective mass for outer frame
 
   // Inner (drive) frame parameters
-  const innerFrameWidth = 150;      // inner frame size in pixels
+  const innerFrameWidth = 150;     // inner frame size in pixels
   const innerFrameHeight = 75;     // inner frame height in pixels
   const primaryAmplitude = 30;     // drive amplitude (pixels)
   const primaryFrequency = 2;      // drive frequency in Hz
@@ -94,6 +94,13 @@
   const fingerWidth = 10;
   const fingerLenMargin = 30;
 
+  // Helper function to compute the smallest angle difference accounting for wrap-around
+  function angleDifference(newAngle, oldAngle) {
+    let diff = newAngle - oldAngle;
+    while (diff > Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    return diff;
+  }
 
   // Set up Plotly for streaming rotational velocity data
   var gyroData = [{
@@ -145,7 +152,7 @@
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     const dx = mouseX - centerX;
-    const dy = mouseY - (centerY); // compare relative to center; outerFrameY is applied later in local coordinates
+    const dy = mouseY - centerY;
     const distance = Math.sqrt(dx * dx + dy * dy);
     // Allow rotation if pointer is within the outer frame area
     if (distance < outerFrameSize / Math.sqrt(2) + 30) {
@@ -162,13 +169,14 @@
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
       const dx = mouseX - centerX;
-      const dy = mouseY - (centerY);
+      const dy = mouseY - centerY;
       let currentPointerAngle = Math.atan2(dy, dx);
       let newFrameAngle = initialFrameAngle + (currentPointerAngle - initialPointerAngle);
       let now = Date.now();
       let dt = (now - lastFrameAngleTime) / 1000;
       if (dt > 0) {
-        frameAngularVel = (newFrameAngle - lastFrameAngle) / dt;
+        let angleDiff = angleDifference(newFrameAngle, lastFrameAngle);
+        frameAngularVel = angleDiff / dt;
         lastFrameAngleTime = now;
         lastFrameAngle = newFrameAngle;
       }
@@ -185,7 +193,7 @@
     const touchX = touch.clientX - rect.left;
     const touchY = touch.clientY - rect.top;
     const dx = touchX - centerX;
-    const dy = touchY - (centerY);
+    const dy = touchY - centerY;
     const distance = Math.sqrt(dx * dx + dy * dy);
     if (distance < outerFrameSize / Math.sqrt(2) + 30) {
       rotating = true;
@@ -203,13 +211,14 @@
       const touchX = touch.clientX - rect.left;
       const touchY = touch.clientY - rect.top;
       const dx = touchX - centerX;
-      const dy = touchY - (centerY);
+      const dy = touchY - centerY;
       let currentPointerAngle = Math.atan2(dy, dx);
       let newFrameAngle = initialFrameAngle + (currentPointerAngle - initialPointerAngle);
       let now = Date.now();
       let dt = (now - lastFrameAngleTime) / 1000;
       if (dt > 0) {
-        frameAngularVel = (newFrameAngle - lastFrameAngle) / dt;
+        let angleDiff = angleDifference(newFrameAngle, lastFrameAngle);
+        frameAngularVel = angleDiff / dt;
         lastFrameAngleTime = now;
         lastFrameAngle = newFrameAngle;
       } else {
@@ -234,7 +243,7 @@
     drive = primaryAmplitude * Math.sin(2 * Math.PI * primaryFrequency * t);
     driveVel = primaryAmplitude * 2 * Math.PI * primaryFrequency * Math.cos(2 * Math.PI * primaryFrequency * t);
     
-    // Use outer frames rotational velocity as effective omega
+    // Use outer frame's rotational velocity as effective omega
     let effectiveOmega = frameAngularVel;
     omegaValueSpan.textContent = effectiveOmega.toFixed(2);
     
@@ -244,7 +253,7 @@
     // Outer frame vertical acceleration with spring restoring force along its local y‑axis
     let a_out = (F_c - springK_inner * innerFrameY) / m_inner;
     innerFrameV += a_out * dt;
-    innerFrameV *= Math.exp(--dampingInner * dt);
+    innerFrameV *= Math.exp(-dampingInner * dt);
     innerFrameY += innerFrameV * dt;
     
     // Update Plotly plot with the rotational velocity data
@@ -264,7 +273,6 @@
     ctx.translate(centerX, centerY);
     ctx.rotate(frameAngle);
 
-    
     // Draw outer (sensing) frame as a large square with thick border
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 20;
@@ -278,7 +286,7 @@
     ctx.translate(0, innerFrameY);
     ctx.lineWidth = 3;
     drawSpring(innerFrameWidth/2, innerFrameHeight/2, innerFrameWidth/2, outerFrameSize/2 - innerFrameY );
-    drawSpring(-innerFrameWidth/2, innerFrameHeight/2, -innerFrameWidth/2, outerFrameSize/2- innerFrameY );
+    drawSpring(-innerFrameWidth/2, innerFrameHeight/2, -innerFrameWidth/2, outerFrameSize/2 - innerFrameY );
     drawSpring(innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth/2, -outerFrameSize/2 - innerFrameY );
     drawSpring(-innerFrameWidth/2, -innerFrameHeight/2, -innerFrameWidth/2, -outerFrameSize/2 - innerFrameY );
     ctx.fillRect(-innerFrameWidth/2, -innerFrameHeight/2, -innerFrameWidth/2 + fingerLenMargin, fingerWidth);
