@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dual-Frame MEMS Gyroscope Simulation</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #fff;
+    }
+    canvas {
+      display: block;
+      background: #fff;
+    }
+    #info {
+      position: absolute;
+      top: 0;
+      left: 0;
+      color: #000;
+      padding: 10px;
+      font-family: sans-serif;
+      font-size: 14px;
+      background: rgba(255,255,255,0.9);
+      z-index: 10;
+    }
+    /* Reserve space at the bottom for the Plotly plot */
+    #gyroPlot {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 300px;
+      background: #fff;
+    }
+  </style>
+  <!-- Include Plotly library -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="info">
+  <p><strong>Dual-Frame MEMS Gyroscope Simulation</strong></p>
+  <p>
+    The outer (sensing) frame rotates and moves only along its local y‑axis (perpendicular to the resonator’s drive direction), while the inner (drive) frame vibrates horizontally and holds the resonating mass.
+  </p>
+  <p>
+    Rotational Velocity: <span id="omegaValue">0.00</span> rad/s
+  </p>
+</div>
+<div id="gyroPlot"></div>
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const omegaValueSpan = document.getElementById('omegaValue');
+
+  // Set canvas dimensions (reserve space for Plotly plot)
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight - 300;
+  let centerX = canvas.width / 2;
+  let centerY = canvas.height / 2;
+
+  // Outer (sensing) frame parameters
+  const outerFrameSize = 300;      // size of outer frame in pixels
+  const springK_inner = 30;        // spring constant for vertical restoring force
+  const -dampingInner = 4;          // damping for outer frame vertical motion
+  const m_inner = 1.0;             // effective mass for outer frame
+
+  // Inner (drive) frame parameters
+  const innerFrameWidth = 150;      // inner frame size in pixels
+  const innerFrameHeight = 75;     // inner frame height in pixels
+  const primaryAmplitude = 30;     // drive amplitude (pixels)
+  const primaryFrequency = 2;      // drive frequency in Hz
+
+  // Resonating mass parameters (inside inner frame)
+  const massWidth = 50, massHeight = 30;  
+
+  // Simulation state variables
+  let drive = 0;         // horizontal displacement of inner frame (drive mode)
+  let driveVel = 0;      // drive velocity
+  let innerFrameY = 0;   // displacement of outer frame along its local y‑axis
+  let innerFrameV = 0;   // vertical velocity of outer frame (along its local y‑axis)
+
+  // Outer frame rotation state (controlled via dragging)
+  let frameAngle = 0;         // rotation angle (radians)
+  let frameAngularVel = 0;    // rotational velocity (rad/s)
+  let rotating = false;
+  let initialPointerAngle = 0;
+  let initialFrameAngle = 0;
+  let lastFrameAngle = frameAngle;
+  let lastFrameAngleTime = Date.now();
+
+  const fingerWidth = 10;
+  const fingerLenMargin = 30;
+
+
+  // Set up Plotly for streaming rotational velocity data
+  var gyroData = [{
+    x: [],
+    y: [],
+    mode: 'lines',
+    type: 'scatter',
+    line: { shape: 'spline' }
+  }];
+  var gyroLayout = {
+    title: 'Rotational Velocity over Time',
+    xaxis: { title: 'Time (s)' },
+    yaxis: { title: 'Rotational Velocity (rad/s)' },
+    margin: { t: 40, b: 40 }
+  };
+  Plotly.newPlot('gyroPlot', gyroData, gyroLayout);
+
+  function drawSpring(x1, y1, x2, y2) {
+    const segments = 20;
+    const amplitude = 10;
+    const oscillations = 4; // Number of full sine cycles along the spring
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    let angle = Math.atan2(dy, dx);
+    // Compute perpendicular unit vector
+    let perpX = -Math.sin(angle);
+    let perpY = Math.cos(angle);
+  
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    for (let i = 1; i < segments; i++) {
+      let t = i / segments;
+      // Calculate the point along the main line
+      let cx = x1 + dx * t;
+      let cy = y1 + dy * t;
+      // Calculate offset perpendicular to the main line using sine function
+      let offset = amplitude * Math.sin(t * Math.PI * oscillations);
+      let px = cx + offset * perpX;
+      let py = cy + offset * perpY;
+      ctx.lineTo(px, py);
+    }
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  // Event listeners for interactive rotation of the outer frame
+  canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const dx = mouseX - centerX;
+    const dy = mouseY - (centerY); // compare relative to center; outerFrameY is applied later in local coordinates
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    // Allow rotation if pointer is within the outer frame area
+    if (distance < outerFrameSize / Math.sqrt(2) + 30) {
+      rotating = true;
+      initialPointerAngle = Math.atan2(dy, dx);
+      initialFrameAngle = frameAngle;
+      lastFrameAngle = frameAngle;
+      lastFrameAngleTime = Date.now();
+    }
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    if (rotating) {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const dx = mouseX - centerX;
+      const dy = mouseY - (centerY);
+      let currentPointerAngle = Math.atan2(dy, dx);
+      let newFrameAngle = initialFrameAngle + (currentPointerAngle - initialPointerAngle);
+      let now = Date.now();
+      let dt = (now - lastFrameAngleTime) / 1000;
+      if (dt > 0) {
+        frameAngularVel = (newFrameAngle - lastFrameAngle) / dt;
+        lastFrameAngleTime = now;
+        lastFrameAngle = newFrameAngle;
+      }
+      frameAngle = newFrameAngle;
+    }
+  });
+  canvas.addEventListener('mouseup', () => {
+    rotating = false;
+    frameAngularVel = 0;
+  });
+  canvas.addEventListener('touchstart', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const touchX = touch.clientX - rect.left;
+    const touchY = touch.clientY - rect.top;
+    const dx = touchX - centerX;
+    const dy = touchY - (centerY);
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance < outerFrameSize / Math.sqrt(2) + 30) {
+      rotating = true;
+      initialPointerAngle = Math.atan2(dy, dx);
+      initialFrameAngle = frameAngle;
+      lastFrameAngle = frameAngle;
+      lastFrameAngleTime = Date.now();
+    }
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => {
+    if (rotating) {
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      const touchX = touch.clientX - rect.left;
+      const touchY = touch.clientY - rect.top;
+      const dx = touchX - centerX;
+      const dy = touchY - (centerY);
+      let currentPointerAngle = Math.atan2(dy, dx);
+      let newFrameAngle = initialFrameAngle + (currentPointerAngle - initialPointerAngle);
+      let now = Date.now();
+      let dt = (now - lastFrameAngleTime) / 1000;
+      if (dt > 0) {
+        frameAngularVel = (newFrameAngle - lastFrameAngle) / dt;
+        lastFrameAngleTime = now;
+        lastFrameAngle = newFrameAngle;
+      } else {
+        frameAngularVel = 0;
+      }
+      frameAngle = newFrameAngle;
+    }
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchend', (e) => {
+    rotating = false;
+    e.preventDefault();
+  }, { passive: false });
+
+  // Timing for animation
+  let startTime = Date.now();
+  let lastFrameTime = Date.now();
+
+  function updatePhysics(dt) {
+    let t = (Date.now() - startTime) / 1000;
+    // Update inner (drive) frame horizontal motion (relative to outer frame's center)
+    drive = primaryAmplitude * Math.sin(2 * Math.PI * primaryFrequency * t);
+    driveVel = primaryAmplitude * 2 * Math.PI * primaryFrequency * Math.cos(2 * Math.PI * primaryFrequency * t);
+    
+    // Use outer frames rotational velocity as effective omega
+    let effectiveOmega = frameAngularVel;
+    omegaValueSpan.textContent = effectiveOmega.toFixed(2);
+    
+    // Compute Coriolis-like force on the outer frame due to the inner drive motion:
+    // F_c = -2 * m_inner * effectiveOmega * driveVel (applied along outer frame's y‑axis)
+    let F_c = -2 * 0.1 * effectiveOmega * driveVel;
+    // Outer frame vertical acceleration with spring restoring force along its local y‑axis
+    let a_out = (F_c - springK_inner * innerFrameY) / m_inner;
+    innerFrameV += a_out * dt;
+    innerFrameV *= Math.exp(--dampingInner * dt);
+    innerFrameY += innerFrameV * dt;
+    
+    // Update Plotly plot with the rotational velocity data
+    let currentTime = (Date.now() - startTime) / 1000;
+    Plotly.extendTraces('gyroPlot', {
+      x: [[currentTime]],
+      y: [[effectiveOmega]]
+    }, [0], 300);
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw the outer frame:
+    // Translate to world center, rotate by frameAngle, then translate along outer frame's local y‑axis
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(frameAngle);
+
+    
+    // Draw outer (sensing) frame as a large square with thick border
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 20;
+    ctx.strokeRect(-outerFrameSize/2, -outerFrameSize/2, outerFrameSize, outerFrameSize);
+    
+    ctx.fillRect(-outerFrameSize/2, -fingerWidth/2, innerFrameWidth/2 - fingerLenMargin, fingerWidth);
+    ctx.fillRect(outerFrameSize/2, -fingerWidth/2, -innerFrameWidth/2 + fingerLenMargin, fingerWidth);
+    
+    // Draw the inner (drive) frame inside the outer frame:
+    // It vibrates horizontally relative to the outer frame's center.
+    ctx.translate(0, innerFrameY);
+    ctx.lineWidth = 3;
+    drawSpring(innerFrameWidth/2, innerFrameHeight/2, innerFrameWidth/2, outerFrameSize/2 - innerFrameY );
+    drawSpring(-innerFrameWidth/2, innerFrameHeight/2, -innerFrameWidth/2, outerFrameSize/2- innerFrameY );
+    drawSpring(innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth/2, -outerFrameSize/2 - innerFrameY );
+    drawSpring(-innerFrameWidth/2, -innerFrameHeight/2, -innerFrameWidth/2, -outerFrameSize/2 - innerFrameY );
+    ctx.fillRect(-innerFrameWidth/2, -innerFrameHeight/2, -innerFrameWidth/2 + fingerLenMargin, fingerWidth);
+    ctx.fillRect(-innerFrameWidth/2, innerFrameHeight/2 - fingerWidth, -innerFrameWidth/2 + fingerLenMargin, fingerWidth);
+    ctx.fillRect(innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth/2 - fingerLenMargin, fingerWidth);
+    ctx.fillRect(innerFrameWidth/2, innerFrameHeight/2 - fingerWidth, innerFrameWidth/2 - fingerLenMargin, fingerWidth);
+    ctx.save();
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(-innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth, innerFrameHeight);
+    ctx.translate(drive, 0);
+    // Draw the resonating mass inside the inner frame
+    ctx.fillStyle = '#aaa';
+    ctx.fillRect(-massWidth/2, -massHeight/2, massWidth, massHeight);
+    ctx.restore();
+    
+    ctx.restore();
+    
+    // Draw a center marker for the outer frame in world coordinates
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 5, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+
+  function animate() {
+    let now = Date.now();
+    let dt = (now - lastFrameTime) / 1000;
+    lastFrameTime = now;
+    
+    updatePhysics(dt);
+    render();
+    requestAnimationFrame(animate);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight - 300;
+    centerX = canvas.width / 2;
+    centerY = canvas.height / 2;
+  });
+</script>
+</body>
+</html>
