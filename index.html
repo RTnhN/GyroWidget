@@ -5,14 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MEMS Gyroscope Simulation</title>
   <style>
-    body {
-      margin: 0;
-      background: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      width: 100vw;
-    }
+
     /* Container to hold simulation elements */
     #Gyrocontainer {
     display: flex;
@@ -28,7 +21,7 @@
       display: block;
       background: #fff;
     }
-    #info {
+    #gyroInfo {
       color: #000;
       padding: 5px;
       font-family: sans-serif;
@@ -47,7 +40,7 @@
 </head>
 <body>
   <div id="Gyrocontainer">
-      <div id="info">
+      <div id="gyroInfo">
           <p><strong>Dual-Frame MEMS Gyroscope Simulation</strong></p>
           <p>
               The outer (sensing) frame rotates and moves only along its local y-axis (perpendicular to the resonator's drive direction), while the inner (drive) frame vibrates horizontally and holds the resonating mass.
@@ -68,9 +61,9 @@
       
         // Set canvas dimensions based on container (reserve space for the Plotly plot)
         gyroCanvas.width = gyroContainer.clientWidth;
-        gyroCanvas.height = gyroContainer.clientHeight - gyroPlotDiv.clientHeight - 200;
-        let centerX = gyroCanvas.width / 2;
-        let centerY = gyroCanvas.height / 2;
+        gyroCanvas.height = gyroContainer.clientHeight - gyroPlotDiv.clientHeight - 400;
+        let gyroCenterX = gyroCanvas.width / 2;
+        let gyroCenterY = gyroCanvas.height / 2;
       
       
         // Scale factor based on container width relative to a 400px reference
@@ -168,8 +161,8 @@
           const rect = gyroCanvas.getBoundingClientRect();
           const mouseX = e.clientX - rect.left;
           const mouseY = e.clientY - rect.top;
-          const dx = mouseX - centerX;
-          const dy = mouseY - centerY;
+          const dx = mouseX - gyroCenterX;
+          const dy = mouseY - gyroCenterY;
           const distance = Math.sqrt(dx * dx + dy * dy);
           if (distance < outerFrameSize / Math.sqrt(2) + 30 * scaleFactor) {
             rotating = true;
@@ -184,8 +177,8 @@
             const rect = gyroCanvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
-            const dx = mouseX - centerX;
-            const dy = mouseY - centerY;
+            const dx = mouseX - gyroCenterX;
+            const dy = mouseY - gyroCenterY;
             let currentPointerAngle = Math.atan2(dy, dx);
             let newFrameAngle = initialFrameAngle + (currentPointerAngle - initialPointerAngle);
             let now = Date.now();
@@ -208,8 +201,8 @@
           const touch = e.touches[0];
           const touchX = touch.clientX - rect.left;
           const touchY = touch.clientY - rect.top;
-          const dx = touchX - centerX;
-          const dy = touchY - centerY;
+          const dx = touchX - gyroCenterX;
+          const dy = touchY - gyroCenterY;
           const distance = Math.sqrt(dx * dx + dy * dy);
           if (distance < outerFrameSize / Math.sqrt(2) + 30 * scaleFactor) {
             rotating = true;
@@ -226,8 +219,8 @@
             const touch = e.touches[0];
             const touchX = touch.clientX - rect.left;
             const touchY = touch.clientY - rect.top;
-            const dx = touchX - centerX;
-            const dy = touchY - centerY;
+            const dx = touchX - gyroCenterX;
+            const dy = touchY - gyroCenterY;
             let currentPointerAngle = Math.atan2(dy, dx);
             let newFrameAngle = initialFrameAngle + (currentPointerAngle - initialPointerAngle);
             let now = Date.now();
@@ -252,7 +245,7 @@
         let gyroStartTime = Date.now();
         let gyroLastFrameTime = Date.now();
       
-        function updatePhysics(dt) {
+        function updateGyroPhysics(dt) {
           let t = (Date.now() - gyroStartTime) / 1000;
           drive = primaryAmplitude * Math.sin(2 * Math.PI * primaryFrequency * t);
           driveVel = primaryAmplitude * 2 * Math.PI * primaryFrequency * Math.cos(2 * Math.PI * primaryFrequency * t);
@@ -270,10 +263,10 @@
           }, [0], 300);
         }
       
-        function render() {
+        function gyroRender() {
           gyroctx.clearRect(0, 0, gyroCanvas.width, gyroCanvas.height);
           gyroctx.save();
-          gyroctx.translate(centerX, centerY);
+          gyroctx.translate(gyroCenterX, gyroCenterY);
           gyroctx.rotate(frameAngle);
           gyroctx.strokeStyle = '#333';
           gyroctx.lineWidth = 40 * scaleFactor;
@@ -329,22 +322,24 @@
           gyroctx.fillStyle = '#333';
         }
       
-        function animate() {
+        function animateGyro() {
           let now = Date.now();
           let dt = (now - gyroLastFrameTime) / 1000;
           gyroLastFrameTime = now;
-          updatePhysics(dt);
-          render();
-          requestAnimationFrame(animate);
+          updateGyroPhysics(dt);
+          gyroRender();
+          requestAnimationFrame(animateGyro);
         }
-        animate();
+        animateGyro();
       
-        window.addEventListener('resize', () => {
+        function resizeGyro() {
           gyroCanvas.width = gyroContainer.clientWidth;
           gyroCanvas.height = gyroContainer.clientHeight - gyroPlotDiv.clientHeight;
-          centerX = gyroCanvas.width / 2;
-          centerY = gyroCanvas.height / 2;
-        });
+          gyroCenterX = gyroCanvas.width / 2;
+          gyroCenterY = gyroCanvas.height / 2;
+        }
+        window.addEventListener('resize', () => resizeGyro());
+        resizeGyro();
       </script>
 </body>
 </html>
