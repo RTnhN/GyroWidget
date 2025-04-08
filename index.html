@@ -1,345 +1,337 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MEMS Gyroscope Simulation</title>
-  <style>
+<style>
 
-    /* Container to hold simulation elements */
-    #Gyrocontainer {
-    display: flex;
-    flex-direction: column;
-    justify-content: start;
-    align-items: center;
-      width: 300px; /* Adjust between 300 and 500 px as needed */
-      height: 900px;
-      border: 1px solid #ccc;
-      background: #fff;
-    }
-    canvas {
-      display: block;
-      background: #fff;
-    }
-    #gyroInfo {
-      color: #000;
-      padding: 5px;
-      font-family: sans-serif;
-      font-size: 12px;
-      background: rgba(255,255,255,0.9);
-    }
-    /* Reserve space at the bottom for the Plotly plot */
-    #gyroPlot {
-      width: 100%;
-      height: 300px;
-      background: #fff;
-    }
-  </style>
-  <!-- Include Plotly library -->
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-</head>
-<body>
-  <div id="Gyrocontainer">
-      <div id="gyroInfo">
-          <p><strong>Dual-Frame MEMS Gyroscope Simulation</strong></p>
-          <p>
-              The outer (sensing) frame rotates and moves only along its local y-axis (perpendicular to the resonator's drive direction), while the inner (drive) frame vibrates horizontally and holds the resonating mass.
-            </p>
-            <p style="display:none;">
-                Rotational Velocity: <span id="omegaValue">0.00</span> rad/s
-            </p>
-        </div>
-        <canvas id="gyroCanvas"></canvas>
-        <div id="gyroPlot"></div>
+/* Container to hold simulation elements */
+#Gyrocontainer {
+display: flex;
+flex-direction: column;
+justify-content: start;
+align-items: center;
+width: 100%;
+max-width: 900px;
+min-width: 300px;
+height: 900px;
+background: #fff;
+}
+canvas {
+  display: block;
+  background: #fff;
+}
+#gyroInfo {
+  color: #000;
+  padding: 5px;
+  font-family: sans-serif;
+  font-size: 12px;
+  background: rgba(255,255,255,0.9);
+}
+/* Reserve space at the bottom for the Plotly plot */
+#gyroPlot {
+  width: 100%;
+  height: 300px;
+  background: #fff;
+}
+</style>
+<!-- Include Plotly library -->
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<div id="Gyrocontainer">
+  <div id="gyroInfo">
+      <p><strong>Dual-Frame MEMS Gyroscope Simulation</strong></p>
+      <p>
+          The outer (sensing) frame rotates and moves only along its local y-axis (perpendicular to the resonator's drive direction), while the inner (drive) frame vibrates horizontally and holds the resonating mass.
+        </p>
+        <p style="display:none;">
+            Rotational Velocity: <span id="omegaValue">0.00</span> rad/s
+        </p>
     </div>
-    <script>
-        const gyroContainer = document.getElementById('Gyrocontainer');
-        const gyroCanvas = document.getElementById('gyroCanvas');
-        const gyroctx = gyroCanvas.getContext('2d');
-        const omegaValueSpan = document.getElementById('omegaValue');
-        const gyroPlotDiv = document.getElementById('gyroPlot');
-      
-        // Set canvas dimensions based on container (reserve space for the Plotly plot)
-        gyroCanvas.width = gyroContainer.clientWidth;
-        gyroCanvas.height = gyroContainer.clientHeight - gyroPlotDiv.clientHeight - 400;
-        let gyroCenterX = gyroCanvas.width / 2;
-        let gyroCenterY = gyroCanvas.height / 2;
-      
-      
-        // Scale factor based on container width relative to a 400px reference
-        const scaleFactor = gyroContainer.clientWidth / 400 * 0.8;
-      
-        // Outer (sensing) frame parameters (scaled)
-        const outerFrameSize = gyroContainer.clientWidth * 0.5;
-        const springK_inner = 30;
-        const dampingInner = 4;
-        const m_inner = 1.0;
-      
-        // Inner (drive) frame parameters (scaled)
-        const innerFrameWidth = outerFrameSize * 0.5;
-        const innerFrameHeight = outerFrameSize * 0.25;
-        const primaryAmplitude = outerFrameSize * (30 / 300);
-        const primaryFrequency = 2;
-      
-        // Resonating mass parameters (scaled)
-        const gyroMassWidth = outerFrameSize * (50 / 300);
-        const gyroMassHeight = outerFrameSize * (30 / 300);
-      
-        // Finger and support dimensions (scaled)
-        const gyroFingerWidth = outerFrameSize * (10 / 300);
-        const gyroFingerLen = outerFrameSize * (52 / 300);
-        const supportWidth = outerFrameSize * (10 / 300);
-        const supportLen = outerFrameSize * (80 / 300);
-        const supportOffset = outerFrameSize * (20 / 300);
-      
-        // Simulation state variables
-        let drive = 0;
-        let driveVel = 0;
-        let innerFrameY = 0;
-        let innerFrameV = 0;
-      
-        // Outer frame rotation state (controlled via dragging)
-        let frameAngle = 0;
-        let frameAngularVel = 0;
-        let rotating = false;
-        let initialPointerAngle = 0;
-        let initialFrameAngle = 0;
-        let lastFrameAngle = frameAngle;
-        let lastFrameAngleTime = Date.now();
-      
-        // Helper: compute the smallest angle difference accounting for wrap-around
-        function angleDifference(newAngle, oldAngle) {
-          let diff = newAngle - oldAngle;
-          while (diff > Math.PI) diff -= 2 * Math.PI;
-          while (diff < -Math.PI) diff += 2 * Math.PI;
-          return diff;
+    <canvas id="gyroCanvas"></canvas>
+  <div id="gyroPlot"></div>
+</div>
+<script>
+    const gyroContainer = document.getElementById('Gyrocontainer');
+    const gyroCanvas = document.getElementById('gyroCanvas');
+    const gyroctx = gyroCanvas.getContext('2d');
+    const omegaValueSpan = document.getElementById('omegaValue');
+    const gyroPlotDiv = document.getElementById('gyroPlot');
+  
+    // Set canvas dimensions based on container (reserve space for the Plotly plot)
+    gyroCanvas.width = gyroContainer.clientWidth;
+    gyroCanvas.height = gyroContainer.clientHeight - gyroPlotDiv.clientHeight - 400;
+    let gyroCenterX = gyroCanvas.width / 2;
+    let gyroCenterY = gyroCanvas.height / 2;
+  
+  
+    // Scale factor based on container width relative to a 400px reference
+    const scaleFactor = gyroContainer.clientWidth / 400 * 0.8;
+  
+    // Outer (sensing) frame parameters (scaled)
+    const outerFrameSize = gyroContainer.clientWidth * 0.5;
+    const springK_inner = 30;
+    const dampingInner = 4;
+    const m_inner = 1.0;
+  
+    // Inner (drive) frame parameters (scaled)
+    const innerFrameWidth = outerFrameSize * 0.5;
+    const innerFrameHeight = outerFrameSize * 0.25;
+    const primaryAmplitude = outerFrameSize * (30 / 300);
+    const primaryFrequency = 2;
+  
+    // Resonating mass parameters (scaled)
+    const gyroMassWidth = outerFrameSize * (50 / 300);
+    const gyroMassHeight = outerFrameSize * (30 / 300);
+  
+    // Finger and support dimensions (scaled)
+    const gyroFingerWidth = outerFrameSize * (10 / 300);
+    const gyroFingerLen = outerFrameSize * (52 / 300);
+    const supportWidth = outerFrameSize * (10 / 300);
+    const supportLen = outerFrameSize * (80 / 300);
+    const supportOffset = outerFrameSize * (20 / 300);
+  
+    // Simulation state variables
+    let drive = 0;
+    let driveVel = 0;
+    let innerFrameY = 0;
+    let innerFrameV = 0;
+  
+    // Outer frame rotation state (controlled via dragging)
+    let frameAngle = 0;
+    let frameAngularVel = 0;
+    let rotating = false;
+    let initialPointerAngle = 0;
+    let initialFrameAngle = 0;
+    let lastFrameAngle = frameAngle;
+    let lastFrameAngleTime = Date.now();
+  
+    // Helper: compute the smallest angle difference accounting for wrap-around
+    function angleDifference(newAngle, oldAngle) {
+      let diff = newAngle - oldAngle;
+      while (diff > Math.PI) diff -= 2 * Math.PI;
+      while (diff < -Math.PI) diff += 2 * Math.PI;
+      return diff;
+    }
+  
+    // Set up Plotly for streaming rotational velocity data
+    var gyroData = [{
+      x: [],
+      y: [],
+      mode: 'lines',
+      type: 'scatter',
+      line: { shape: 'spline' }
+    }];
+    var gyroLayout = {
+      title: 'Rotational Velocity over Time',
+      xaxis: { title: 'Time (s)' },
+      yaxis: { title: 'Rotational Velocity (rad/s)' },
+      margin: { t: 40, b: 40 }
+    };
+    Plotly.newPlot('gyroPlot', gyroData, gyroLayout);
+  
+    function drawSpring(x1, y1, x2, y2, coils) {
+      const segments = 40;
+      const amplitude = 10 * scaleFactor;
+      const oscillations = coils;
+      let dx = x2 - x1;
+      let dy = y2 - y1;
+      let angle = Math.atan2(dy, dx);
+      let perpX = -Math.sin(angle);
+      let perpY = Math.cos(angle);
+    
+      gyroctx.beginPath();
+      gyroctx.moveTo(x1, y1);
+      for (let i = 1; i < segments; i++) {
+        let t = i / segments;
+        let cx = x1 + dx * t;
+        let cy = y1 + dy * t;
+        let offset = amplitude * Math.sin(t * Math.PI * oscillations);
+        let px = cx + offset * perpX;
+        let py = cy + offset * perpY;
+        gyroctx.lineTo(px, py);
+      }
+      gyroctx.lineTo(x2, y2);
+      gyroctx.stroke();
+    }
+  
+    // Event listeners for interactive rotation of the outer frame
+    gyroCanvas.addEventListener('mousedown', (e) => {
+      const rect = gyroCanvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const dx = mouseX - gyroCenterX;
+      const dy = mouseY - gyroCenterY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < outerFrameSize / Math.sqrt(2) + 30 * scaleFactor) {
+        rotating = true;
+        initialPointerAngle = Math.atan2(dy, dx);
+        initialFrameAngle = frameAngle;
+        lastFrameAngle = frameAngle;
+        lastFrameAngleTime = Date.now();
+      }
+    });
+    gyroCanvas.addEventListener('mousemove', (e) => {
+      if (rotating) {
+        const rect = gyroCanvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const dx = mouseX - gyroCenterX;
+        const dy = mouseY - gyroCenterY;
+        let currentPointerAngle = Math.atan2(dy, dx);
+        let newFrameAngle = initialFrameAngle + (currentPointerAngle - initialPointerAngle);
+        let now = Date.now();
+        let dt = (now - lastFrameAngleTime) / 1000;
+        if (dt > 0) {
+          let angleDiff = angleDifference(newFrameAngle, lastFrameAngle);
+          frameAngularVel = angleDiff / dt;
+          lastFrameAngleTime = now;
+          lastFrameAngle = newFrameAngle;
         }
-      
-        // Set up Plotly for streaming rotational velocity data
-        var gyroData = [{
-          x: [],
-          y: [],
-          mode: 'lines',
-          type: 'scatter',
-          line: { shape: 'spline' }
-        }];
-        var gyroLayout = {
-          title: 'Rotational Velocity over Time',
-          xaxis: { title: 'Time (s)' },
-          yaxis: { title: 'Rotational Velocity (rad/s)' },
-          margin: { t: 40, b: 40 }
-        };
-        Plotly.newPlot('gyroPlot', gyroData, gyroLayout);
-      
-        function drawSpring(x1, y1, x2, y2, coils) {
-          const segments = 40;
-          const amplitude = 10 * scaleFactor;
-          const oscillations = coils;
-          let dx = x2 - x1;
-          let dy = y2 - y1;
-          let angle = Math.atan2(dy, dx);
-          let perpX = -Math.sin(angle);
-          let perpY = Math.cos(angle);
-        
-          gyroctx.beginPath();
-          gyroctx.moveTo(x1, y1);
-          for (let i = 1; i < segments; i++) {
-            let t = i / segments;
-            let cx = x1 + dx * t;
-            let cy = y1 + dy * t;
-            let offset = amplitude * Math.sin(t * Math.PI * oscillations);
-            let px = cx + offset * perpX;
-            let py = cy + offset * perpY;
-            gyroctx.lineTo(px, py);
-          }
-          gyroctx.lineTo(x2, y2);
-          gyroctx.stroke();
-        }
-      
-        // Event listeners for interactive rotation of the outer frame
-        gyroCanvas.addEventListener('mousedown', (e) => {
-          const rect = gyroCanvas.getBoundingClientRect();
-          const mouseX = e.clientX - rect.left;
-          const mouseY = e.clientY - rect.top;
-          const dx = mouseX - gyroCenterX;
-          const dy = mouseY - gyroCenterY;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          if (distance < outerFrameSize / Math.sqrt(2) + 30 * scaleFactor) {
-            rotating = true;
-            initialPointerAngle = Math.atan2(dy, dx);
-            initialFrameAngle = frameAngle;
-            lastFrameAngle = frameAngle;
-            lastFrameAngleTime = Date.now();
-          }
-        });
-        gyroCanvas.addEventListener('mousemove', (e) => {
-          if (rotating) {
-            const rect = gyroCanvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-            const dx = mouseX - gyroCenterX;
-            const dy = mouseY - gyroCenterY;
-            let currentPointerAngle = Math.atan2(dy, dx);
-            let newFrameAngle = initialFrameAngle + (currentPointerAngle - initialPointerAngle);
-            let now = Date.now();
-            let dt = (now - lastFrameAngleTime) / 1000;
-            if (dt > 0) {
-              let angleDiff = angleDifference(newFrameAngle, lastFrameAngle);
-              frameAngularVel = angleDiff / dt;
-              lastFrameAngleTime = now;
-              lastFrameAngle = newFrameAngle;
-            }
-            frameAngle = newFrameAngle;
-          }
-        });
-        gyroCanvas.addEventListener('mouseup', () => {
-          rotating = false;
+        frameAngle = newFrameAngle;
+      }
+    });
+    gyroCanvas.addEventListener('mouseup', () => {
+      rotating = false;
+      frameAngularVel = 0;
+    });
+    gyroCanvas.addEventListener('touchstart', (e) => {
+      const rect = gyroCanvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      const touchX = touch.clientX - rect.left;
+      const touchY = touch.clientY - rect.top;
+      const dx = touchX - gyroCenterX;
+      const dy = touchY - gyroCenterY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < outerFrameSize / Math.sqrt(2) + 30 * scaleFactor) {
+        rotating = true;
+        initialPointerAngle = Math.atan2(dy, dx);
+        initialFrameAngle = frameAngle;
+        lastFrameAngle = frameAngle;
+        lastFrameAngleTime = Date.now();
+      }
+      e.preventDefault();
+    }, { passive: false });
+    gyroCanvas.addEventListener('touchmove', (e) => {
+      if (rotating) {
+        const rect = gyroCanvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        const touchX = touch.clientX - rect.left;
+        const touchY = touch.clientY - rect.top;
+        const dx = touchX - gyroCenterX;
+        const dy = touchY - gyroCenterY;
+        let currentPointerAngle = Math.atan2(dy, dx);
+        let newFrameAngle = initialFrameAngle + (currentPointerAngle - initialPointerAngle);
+        let now = Date.now();
+        let dt = (now - lastFrameAngleTime) / 1000;
+        if (dt > 0) {
+          let angleDiff = angleDifference(newFrameAngle, lastFrameAngle);
+          frameAngularVel = angleDiff / dt;
+          lastFrameAngleTime = now;
+          lastFrameAngle = newFrameAngle;
+        } else {
           frameAngularVel = 0;
-        });
-        gyroCanvas.addEventListener('touchstart', (e) => {
-          const rect = gyroCanvas.getBoundingClientRect();
-          const touch = e.touches[0];
-          const touchX = touch.clientX - rect.left;
-          const touchY = touch.clientY - rect.top;
-          const dx = touchX - gyroCenterX;
-          const dy = touchY - gyroCenterY;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          if (distance < outerFrameSize / Math.sqrt(2) + 30 * scaleFactor) {
-            rotating = true;
-            initialPointerAngle = Math.atan2(dy, dx);
-            initialFrameAngle = frameAngle;
-            lastFrameAngle = frameAngle;
-            lastFrameAngleTime = Date.now();
-          }
-          e.preventDefault();
-        }, { passive: false });
-        gyroCanvas.addEventListener('touchmove', (e) => {
-          if (rotating) {
-            const rect = gyroCanvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            const touchX = touch.clientX - rect.left;
-            const touchY = touch.clientY - rect.top;
-            const dx = touchX - gyroCenterX;
-            const dy = touchY - gyroCenterY;
-            let currentPointerAngle = Math.atan2(dy, dx);
-            let newFrameAngle = initialFrameAngle + (currentPointerAngle - initialPointerAngle);
-            let now = Date.now();
-            let dt = (now - lastFrameAngleTime) / 1000;
-            if (dt > 0) {
-              let angleDiff = angleDifference(newFrameAngle, lastFrameAngle);
-              frameAngularVel = angleDiff / dt;
-              lastFrameAngleTime = now;
-              lastFrameAngle = newFrameAngle;
-            } else {
-              frameAngularVel = 0;
-            }
-            frameAngle = newFrameAngle;
-          }
-          e.preventDefault();
-        }, { passive: false });
-        gyroCanvas.addEventListener('touchend', (e) => {
-          rotating = false;
-          e.preventDefault();
-        }, { passive: false });
-      
-        let gyroStartTime = Date.now();
-        let gyroLastFrameTime = Date.now();
-      
-        function updateGyroPhysics(dt) {
-          let t = (Date.now() - gyroStartTime) / 1000;
-          drive = primaryAmplitude * Math.sin(2 * Math.PI * primaryFrequency * t);
-          driveVel = primaryAmplitude * 2 * Math.PI * primaryFrequency * Math.cos(2 * Math.PI * primaryFrequency * t);
-          let effectiveOmega = frameAngularVel;
-          omegaValueSpan.textContent = effectiveOmega.toFixed(2);
-          let F_c = -2 * 0.1 * effectiveOmega * driveVel;
-          let a_out = (F_c - springK_inner * innerFrameY) / m_inner;
-          innerFrameV += a_out * dt;
-          innerFrameV *= Math.exp(-dampingInner * dt);
-          innerFrameY += innerFrameV * dt;
-          let currentTime = (Date.now() - gyroStartTime) / 1000;
-          Plotly.extendTraces('gyroPlot', {
-            x: [[currentTime]],
-            y: [[effectiveOmega]]
-          }, [0], 300);
         }
-      
-        function gyroRender() {
-          gyroctx.clearRect(0, 0, gyroCanvas.width, gyroCanvas.height);
-          gyroctx.save();
-          gyroctx.translate(gyroCenterX, gyroCenterY);
-          gyroctx.rotate(frameAngle);
-          gyroctx.strokeStyle = '#333';
-          gyroctx.lineWidth = 40 * scaleFactor;
-          gyroctx.strokeRect(-outerFrameSize/2, -outerFrameSize/2, outerFrameSize, outerFrameSize);
-          gyroctx.fillRect(-outerFrameSize/2, -gyroFingerWidth/2, gyroFingerLen, gyroFingerWidth);
-          gyroctx.fillRect(outerFrameSize/2, -gyroFingerWidth/2, -gyroFingerLen, gyroFingerWidth);
-          gyroctx.fillRect(supportOffset + supportWidth, outerFrameSize/2, supportWidth, -supportLen);
-          gyroctx.fillRect(-supportOffset - supportWidth, outerFrameSize/2, supportWidth, -supportLen);
-          gyroctx.fillRect(supportOffset + supportWidth, -outerFrameSize/2, supportWidth, supportLen);
-          gyroctx.fillRect(-supportOffset - supportWidth, -outerFrameSize/2, supportWidth, supportLen);
-          gyroctx.fillStyle = '#aaa';
-          gyroctx.font = `${16 * scaleFactor}px sans-serif`;
-          gyroctx.textAlign = 'center';
-          gyroctx.fillText('Click and Drag Here', 0, -outerFrameSize/2 + 10 * scaleFactor);
-          gyroctx.rotate(-180 * Math.PI/180);
-          gyroctx.fillText('Click and Drag Here', 0, -outerFrameSize/2 + 10 * scaleFactor);
-          gyroctx.rotate(90 * Math.PI/180);
-          gyroctx.fillText('Click and Drag Here', 0, -outerFrameSize/2 + 10 * scaleFactor);
-          gyroctx.rotate(180 * Math.PI/180);
-          gyroctx.fillText('Click and Drag Here', 0, -outerFrameSize/2 + 10 * scaleFactor);
-          gyroctx.rotate(-90 * Math.PI/180);
-          gyroctx.fillStyle = '#333';
-          gyroctx.translate(0, innerFrameY);
-          gyroctx.lineWidth = 3 * scaleFactor;
-          let gyroCoils = 8;
-          drawSpring(innerFrameWidth/2, innerFrameHeight/2, innerFrameWidth/2, outerFrameSize/2 - innerFrameY - 10 * scaleFactor, gyroCoils);
-          drawSpring(-innerFrameWidth/2, innerFrameHeight/2, -innerFrameWidth/2, outerFrameSize/2 - innerFrameY - 10 * scaleFactor, gyroCoils);
-          drawSpring(innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth/2, -outerFrameSize/2 - innerFrameY + 10 * scaleFactor, gyroCoils);
-          drawSpring(-innerFrameWidth/2, -innerFrameHeight/2, -innerFrameWidth/2, -outerFrameSize/2 - innerFrameY + 10 * scaleFactor, gyroCoils);
-          gyroctx.fillStyle = '#aaa';
-          gyroctx.fillRect(-innerFrameWidth/2, -innerFrameHeight/2, -gyroFingerLen, gyroFingerWidth);
-          gyroctx.fillRect(-innerFrameWidth/2, innerFrameHeight/2 - gyroFingerWidth, -gyroFingerLen, gyroFingerWidth);
-          gyroctx.fillRect(innerFrameWidth/2, -innerFrameHeight/2, gyroFingerLen, gyroFingerWidth);
-          gyroctx.fillRect(innerFrameWidth/2, innerFrameHeight/2 - gyroFingerWidth, gyroFingerLen, gyroFingerWidth);
-          gyroctx.fillStyle = '#aaa';
-          gyroctx.fillRect(supportOffset, innerFrameHeight/2, supportWidth, supportLen);
-          gyroctx.fillRect(-supportOffset, innerFrameHeight/2, supportWidth, supportLen);
-          gyroctx.fillRect(supportOffset, -innerFrameHeight/2, supportWidth, -supportLen);
-          gyroctx.fillRect(-supportOffset, -innerFrameHeight/2, supportWidth, -supportLen);
-          gyroCoils = 4;
-          gyroctx.strokeStyle = '#aaa';
-          drawSpring(innerFrameWidth/2, 0, drive, 0, gyroCoils);
-          drawSpring(-innerFrameWidth/2, 0, drive, 0, gyroCoils);
-          gyroctx.save();
-          gyroctx.strokeStyle = '#aaa';
-          gyroctx.lineWidth = 5 * scaleFactor;
-          gyroctx.strokeRect(-innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth, innerFrameHeight);
-          gyroctx.translate(drive, 0);
-          gyroctx.fillStyle = '#aaa';
-          gyroctx.fillRect(-gyroMassWidth/2, -gyroMassHeight/2, gyroMassWidth, gyroMassHeight);
-          gyroctx.restore();
-          gyroctx.restore();
-          gyroctx.fillStyle = '#333';
-        }
-      
-        function animateGyro() {
-          let now = Date.now();
-          let dt = (now - gyroLastFrameTime) / 1000;
-          gyroLastFrameTime = now;
-          updateGyroPhysics(dt);
-          gyroRender();
-          requestAnimationFrame(animateGyro);
-        }
-        animateGyro();
-      
-        function resizeGyro() {
-          gyroCanvas.width = gyroContainer.clientWidth;
-          gyroCanvas.height = gyroContainer.clientHeight - gyroPlotDiv.clientHeight;
-          gyroCenterX = gyroCanvas.width / 2;
-          gyroCenterY = gyroCanvas.height / 2;
-        }
-        window.addEventListener('resize', () => resizeGyro());
-        resizeGyro();
-      </script>
-</body>
-</html>
+        frameAngle = newFrameAngle;
+      }
+      e.preventDefault();
+    }, { passive: false });
+    gyroCanvas.addEventListener('touchend', (e) => {
+      rotating = false;
+      e.preventDefault();
+    }, { passive: false });
+  
+    let gyroStartTime = Date.now();
+    let gyroLastFrameTime = Date.now();
+  
+    function updateGyroPhysics(dt) {
+      let t = (Date.now() - gyroStartTime) / 1000;
+      drive = primaryAmplitude * Math.sin(2 * Math.PI * primaryFrequency * t);
+      driveVel = primaryAmplitude * 2 * Math.PI * primaryFrequency * Math.cos(2 * Math.PI * primaryFrequency * t);
+      let effectiveOmega = frameAngularVel;
+      omegaValueSpan.textContent = effectiveOmega.toFixed(2);
+      let F_c = -2 * 0.1 * effectiveOmega * driveVel;
+      let a_out = (F_c - springK_inner * innerFrameY) / m_inner;
+      innerFrameV += a_out * dt;
+      innerFrameV *= Math.exp(-dampingInner * dt);
+      innerFrameY += innerFrameV * dt;
+      let currentTime = (Date.now() - gyroStartTime) / 1000;
+      Plotly.extendTraces('gyroPlot', {
+        x: [[currentTime]],
+        y: [[effectiveOmega]]
+      }, [0], 300);
+    }
+  
+    function gyroRender() {
+      gyroctx.clearRect(0, 0, gyroCanvas.width, gyroCanvas.height);
+      gyroctx.save();
+      gyroctx.translate(gyroCenterX, gyroCenterY);
+      gyroctx.rotate(frameAngle);
+      gyroctx.strokeStyle = '#333';
+      gyroctx.lineWidth = 40 * scaleFactor;
+      gyroctx.strokeRect(-outerFrameSize/2, -outerFrameSize/2, outerFrameSize, outerFrameSize);
+      gyroctx.fillRect(-outerFrameSize/2, -gyroFingerWidth/2, gyroFingerLen, gyroFingerWidth);
+      gyroctx.fillRect(outerFrameSize/2, -gyroFingerWidth/2, -gyroFingerLen, gyroFingerWidth);
+      gyroctx.fillRect(supportOffset + supportWidth, outerFrameSize/2, supportWidth, -supportLen);
+      gyroctx.fillRect(-supportOffset - supportWidth, outerFrameSize/2, supportWidth, -supportLen);
+      gyroctx.fillRect(supportOffset + supportWidth, -outerFrameSize/2, supportWidth, supportLen);
+      gyroctx.fillRect(-supportOffset - supportWidth, -outerFrameSize/2, supportWidth, supportLen);
+      gyroctx.fillStyle = '#aaa';
+      gyroctx.font = `${16 * scaleFactor}px sans-serif`;
+      gyroctx.textAlign = 'center';
+      gyroctx.fillText('Click and Drag Here', 0, -outerFrameSize/2 + 10 * scaleFactor);
+      gyroctx.rotate(-180 * Math.PI/180);
+      gyroctx.fillText('Click and Drag Here', 0, -outerFrameSize/2 + 10 * scaleFactor);
+      gyroctx.rotate(90 * Math.PI/180);
+      gyroctx.fillText('Click and Drag Here', 0, -outerFrameSize/2 + 10 * scaleFactor);
+      gyroctx.rotate(180 * Math.PI/180);
+      gyroctx.fillText('Click and Drag Here', 0, -outerFrameSize/2 + 10 * scaleFactor);
+      gyroctx.rotate(-90 * Math.PI/180);
+      gyroctx.fillStyle = '#333';
+      gyroctx.translate(0, innerFrameY);
+      gyroctx.lineWidth = 3 * scaleFactor;
+      let gyroCoils = 8;
+      drawSpring(innerFrameWidth/2, innerFrameHeight/2, innerFrameWidth/2, outerFrameSize/2 - innerFrameY - 10 * scaleFactor, gyroCoils);
+      drawSpring(-innerFrameWidth/2, innerFrameHeight/2, -innerFrameWidth/2, outerFrameSize/2 - innerFrameY - 10 * scaleFactor, gyroCoils);
+      drawSpring(innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth/2, -outerFrameSize/2 - innerFrameY + 10 * scaleFactor, gyroCoils);
+      drawSpring(-innerFrameWidth/2, -innerFrameHeight/2, -innerFrameWidth/2, -outerFrameSize/2 - innerFrameY + 10 * scaleFactor, gyroCoils);
+      gyroctx.fillStyle = '#aaa';
+      gyroctx.fillRect(-innerFrameWidth/2, -innerFrameHeight/2, -gyroFingerLen, gyroFingerWidth);
+      gyroctx.fillRect(-innerFrameWidth/2, innerFrameHeight/2 - gyroFingerWidth, -gyroFingerLen, gyroFingerWidth);
+      gyroctx.fillRect(innerFrameWidth/2, -innerFrameHeight/2, gyroFingerLen, gyroFingerWidth);
+      gyroctx.fillRect(innerFrameWidth/2, innerFrameHeight/2 - gyroFingerWidth, gyroFingerLen, gyroFingerWidth);
+      gyroctx.fillStyle = '#aaa';
+      gyroctx.fillRect(supportOffset, innerFrameHeight/2, supportWidth, supportLen);
+      gyroctx.fillRect(-supportOffset, innerFrameHeight/2, supportWidth, supportLen);
+      gyroctx.fillRect(supportOffset, -innerFrameHeight/2, supportWidth, -supportLen);
+      gyroctx.fillRect(-supportOffset, -innerFrameHeight/2, supportWidth, -supportLen);
+      gyroCoils = 4;
+      gyroctx.strokeStyle = '#aaa';
+      drawSpring(innerFrameWidth/2, 0, drive, 0, gyroCoils);
+      drawSpring(-innerFrameWidth/2, 0, drive, 0, gyroCoils);
+      gyroctx.save();
+      gyroctx.strokeStyle = '#aaa';
+      gyroctx.lineWidth = 5 * scaleFactor;
+      gyroctx.strokeRect(-innerFrameWidth/2, -innerFrameHeight/2, innerFrameWidth, innerFrameHeight);
+      gyroctx.translate(drive, 0);
+      gyroctx.fillStyle = '#aaa';
+      gyroctx.fillRect(-gyroMassWidth/2, -gyroMassHeight/2, gyroMassWidth, gyroMassHeight);
+      gyroctx.restore();
+      gyroctx.restore();
+      gyroctx.fillStyle = '#333';
+    }
+  
+    function animateGyro() {
+      let now = Date.now();
+      let dt = (now - gyroLastFrameTime) / 1000;
+      gyroLastFrameTime = now;
+      updateGyroPhysics(dt);
+      gyroRender();
+      requestAnimationFrame(animateGyro);
+    }
+    animateGyro();
+  
+    function resizeGyro() {
+      gyroCanvas.width = gyroContainer.clientWidth;
+      gyroCanvas.height = gyroContainer.clientHeight - gyroPlotDiv.clientHeight - 200;
+      gyroCenterX = gyroCanvas.width / 2;
+      gyroCenterY = gyroCanvas.height / 2;
+    }
+    window.addEventListener('resize', () => resizeGyro());
+    resizeGyro();
+  </script>
+
